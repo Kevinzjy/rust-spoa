@@ -1,12 +1,11 @@
-#include "poa_func.h"
+#include <string.h>
 #include "spoa/spoa.hpp"
 
 extern "C" {
 
     // see the C header file (poa_func.h) for detailed descriptions of each argument
-    unsigned poa_func(char** seqs, int num_seqs,
-                      char* consensus, int consensus_len,
-                      int alignment_type, int match_score, int mismatch_score, int gap_open, int gap_extend) {
+    const char* poa_func(char** seqs, int num_seqs,
+        int l, int m, int n, int g, int e, int q, int c) {
 
         if (num_seqs == 0) {
             return (unsigned) 0;
@@ -18,33 +17,30 @@ extern "C" {
             sequences.push_back((std::string) seqs[i]);
         }
 
-        auto alignment_engine = spoa::createAlignmentEngine(static_cast<spoa::AlignmentType>(alignment_type),
-                                                            (int8_t) match_score,
-                                                            (int8_t) mismatch_score,
-                                                            (int8_t) gap_open,
-                                                            (int8_t) gap_extend);
-        auto graph = spoa::createGraph();
+        auto alignment_engine = spoa::AlignmentEngine::Create(static_cast<spoa::AlignmentType>(l),
+            m, n, g, e, q, c);
 
+        spoa::Graph graph{};
+        
         // add each of the real sequences (e.g. noisy sequence reads) to the graph
         for (const auto& it: sequences) {
-            auto alignment = (*alignment_engine)(it, graph);
-            graph->add_alignment(alignment, it);
+            auto alignment = alignment_engine->Align(it, graph);
+            graph.AddAlignment(alignment, it);
         }
 
         // generate the consensus sequence, assign it to the allocated memory block, and return the consensus length.
-        std::string cns = graph->generate_consensus();
+        auto cns = graph.GenerateConsensus();
+        
+        // for (int i = 0; i < l; i++){
+        //     consensus[i] = cns[i];
+        // }
 
-        int l = cns.length();
-        if (l > consensus_len) {
-            l = consensus_len;
-        }
+        // sequences.clear();
 
-        for (int i = 0; i < l; i++){
-            consensus[i] = cns[i];
-        }
-
-        sequences.clear();
-
-        return (unsigned) l;
+        // return (unsigned) l;
+        char *cons_str;
+        cons_str = new char [cns.size() + 1];
+        strcpy (cons_str, cns.c_str());
+        return cons_str;
     }
 }

@@ -5,19 +5,23 @@
 //! If you use this crate, please cite the original authors of SPOA:
 //!
 //! [Vaser, R., Sović, I., Nagarajan, N. and Šikić, M., 2017. Fast and accurate de novo genome assembly from long uncorrected reads. Genome research, 27(5), pp.737-746.](https://genome.cshlp.org/content/27/5/737)
+use libc::c_char;
+use std::ffi::CStr;
+use std::str;
 
 extern "C" {
     fn poa_func(
         seqs: *const *const u8,
         num_seqs: i32,
-        consensus: *const u8,
-        consensus_len: i32,
+        // consensus: *const u8,
         alignment_type: i32, // 0 = local, 1 = global, 2 = gapped
         match_score: i32,
         mismatch_score: i32,
         gap_open: i32,
         gap_extend: i32,
-    ) -> u32;
+        gap2_open: i32,
+        gap2_extend: i32,
+    ) -> *const c_char;
 }
 
 /// Generates a consensus sequence from a list of sequences.
@@ -54,27 +58,25 @@ extern "C" {
 ///        }
 ///
 ///        // generate consensus sequence
-///        let consensus = poa_consensus(&seqs, 20, 1, 5, -4, -3, -1);
+///        let consensus = poa_consensus(&seqs, 1, 5, -4, -3, -1, -3, -1);
 ///
-///        let expected = "AATGCCCGTT".to_string().into_bytes();
-///        assert_eq!(consensus, expected);
 ///    }
 /// ```
 
 pub fn poa_consensus(
     seqs: &Vec<Vec<u8>>,
-    consensus_max_length: usize,
     alignment_type: i32,
     match_score: i32,
     mismatch_score: i32,
     gap_open: i32,
-    gap_extend: i32
-) -> Vec<u8> {
+    gap_extend: i32,
+    gap2_open: i32,
+    gap2_extend: i32,
+) -> &str {
 
-    let mut consensus: Vec<u8> = vec![0; consensus_max_length];
+    // let mut consensus: Vec<u8> = Vec::new();
 
     let num_seqs = seqs.len() as i32;
-    let consensus_len = consensus.len() as i32;
 
     let mut seq_ptrs: Vec<*const u8> = Vec::with_capacity(seqs.len());
 
@@ -85,31 +87,52 @@ pub fn poa_consensus(
         seq_ptrs.push(seq.as_ptr());
     }
 
-    unsafe {
-
-        let len = poa_func(
+    let c_buf: *const c_char = unsafe {
+        poa_func(
             seq_ptrs.as_ptr(),
             num_seqs,
-            consensus.as_ptr(),
-            consensus_len,
+            // consensus.as_ptr(),
             alignment_type,
             match_score,
             mismatch_score,
             gap_open,
-            gap_extend
-        );
+            gap_extend,
+            gap2_open,
+            gap2_extend,
+        )
+    };
+    let c_str: &CStr = unsafe { CStr::from_ptr(c_buf) };
+    let str_slice: &str = c_str.to_str().unwrap();
+    // let str_buf: String = str_slice.to_owned();  // if necessary
 
-        consensus.truncate(len as usize);
-    }
-
-
-    consensus
+    str_slice
 }
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_poa() {
+        let seqs = vec!["ATTGCCCGTT",
+        "AATGCCGTT",
+        "AATGCCCGAT",
+        "AACGCCCGTC",
+        "AGTGCTCGTT",
+        "AATGCTCGTT"];
+        let mut cseqs: Vec<Vec<u8>> = Vec::with_capacity(seqs.len()); 
+        for seq in seqs {
+            let mut tmp_seq = String::from(seq);
+            tmp_seq.push_str("\0");
+            cseqs.push((tmp_seq.into_bytes()).to_vec());
+        }
+        
+        let consensus = poa_consensus(&cseqs, 1, 5, -4, -3, -1, -3, -1);
+
+        let expected = "AATGCCCGTT";
+        assert_eq!(consensus, expected);
+    }
 
     #[test]
     fn test_dna_consensus() {
@@ -125,9 +148,9 @@ mod tests {
             seqs.push((*seq).bytes().map(|x|{x as u8}).collect::<Vec<u8>>());
         }
 
-        let consensus = poa_consensus(&seqs, 20, 1, 5, -4, -3, -1);
+        let consensus = poa_consensus(&seqs, 1, 5, -4, -3, -1, -3, -1);
 
-        let expected = "AATGCCCGTT".to_string().into_bytes();
+        let expected = "AATGCCCGTT";
         assert_eq!(consensus, expected);
     }
 
@@ -145,9 +168,10 @@ mod tests {
             seqs.push(seq.chars().into_iter().map(|x|{x as u8}).collect::<Vec<u8>>());
         }
 
-        let consensus = poa_consensus(&seqs, 20, 1, 5, -4, -3, -1);
+        let consensus = poa_consensus(&seqs, 1, 5, -4, -3, -1, -3, -1);
+        eprintln!("{:?}", &consensus);
 
-        let expected = "FNLKPSWDDCQ".to_string().into_bytes();
+        let expected = "FNLKPSWDDCQ";
         assert_eq!(consensus, expected);
 
     }
@@ -167,7 +191,7 @@ mod tests {
             seqs.push((*seq).bytes().map(|x|{x as u8}).collect::<Vec<u8>>());
         }
 
-        poa_consensus(&seqs, 20, 1, 5, -4, -3, -1);
+        poa_consensus(&seqs, 1, 5, -4, -3, -1, -3, -1);
 
     }
 }

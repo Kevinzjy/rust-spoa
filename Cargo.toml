@@ -8,6 +8,7 @@ description = "This crate wraps the C++ SPOA library for generating DNA and prot
 repository = "https://github.com/pjedge/rust-spoa.git"
 
 [dependencies]
+libc = "*"
 
 [build-dependencies]
 cc = "1.0"
