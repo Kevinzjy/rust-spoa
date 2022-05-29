@@ -7,10 +7,6 @@ extern "C" {
     const char* poa_func(char** seqs, int num_seqs,
         int l, int m, int n, int g, int e, int q, int c) {
 
-        if (num_seqs == 0) {
-            return (unsigned) 0;
-        }
-
         // populate the list of sequences
         std::vector<std::string> sequences;
         for (int i = 0; i < num_seqs; i++){

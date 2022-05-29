@@ -74,9 +74,13 @@ pub fn poa_consensus(
     gap2_extend: i32,
 ) -> &str {
 
+    if seqs.len() == 0 {
+        return ""
+    }
+
     // let mut consensus: Vec<u8> = Vec::new();
 
-    let num_seqs = seqs.len() as i32;
+    let num_seqs = seqs.len() as i32;    
 
     let mut seq_ptrs: Vec<*const u8> = Vec::with_capacity(seqs.len());
 
