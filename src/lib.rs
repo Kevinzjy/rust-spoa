@@ -12,8 +12,8 @@ use std::str;
 extern "C" {
     fn poa_func(
         seqs: *const *const u8,
+        quals: *const *const u8,
         num_seqs: i32,
-        // consensus: *const u8,
         alignment_type: i32, // 0 = local, 1 = global, 2 = gapped
         match_score: i32,
         mismatch_score: i32,
@@ -45,6 +45,7 @@ extern "C" {
 ///
 ///     fn test_dna_consensus() {
 ///        let mut seqs = vec![];
+///        let mut quals = vec![];
 ///
 ///        // generated each string by adding small tweaks to the expected consensus "AATGCCCGTT"
 ///        // convert sequences to Vec<u8>
@@ -56,15 +57,24 @@ extern "C" {
 ///            "AATGCTCGTT\0"].iter() {
 ///            seqs.push((*seq).bytes().map(|x|{x as u8}).collect::<Vec<u8>>());
 ///        }
+///        for qual in ["FFFFFFFFF\0",
+///            "FFFFFFFFF\0",
+///            "FFFFFFFFFF\0",
+///            "FFFFFFFFFF\0",
+///            "FFFFFFFFFF\0",
+///            "FFFFFFFFFF\0"].iter() {
+///            quals.push((*qual).bytes().map(|x|{x as u8}).collect::<Vec<u8>>());
+///        }
 ///
 ///        // generate consensus sequence
-///        let consensus = poa_consensus(&seqs, 1, 5, -4, -3, -1, -3, -1);
+///        let consensus = poa_consensus(&seqs, &quals, 1, 5, -4, -3, -1, -3, -1);
 ///
 ///    }
 /// ```
 
-pub fn poa_consensus(
-    seqs: &Vec<Vec<u8>>,
+pub fn poa_consensus <'a>(
+    seqs: &'a Vec<Vec<u8>>,
+    quals: &'a Vec<Vec<u8>>,
     alignment_type: i32,
     match_score: i32,
     mismatch_score: i32,
@@ -72,17 +82,20 @@ pub fn poa_consensus(
     gap_extend: i32,
     gap2_open: i32,
     gap2_extend: i32,
-) -> &str {
+) -> &'a str {
 
     if seqs.len() == 0 {
         return ""
     }
 
-    // let mut consensus: Vec<u8> = Vec::new();
+    if seqs.len() != quals.len() {
+        panic!("Input sequences and qualities must be of same length");
+    }
 
-    let num_seqs = seqs.len() as i32;    
+    let num_seqs = seqs.len() as i32;
 
     let mut seq_ptrs: Vec<*const u8> = Vec::with_capacity(seqs.len());
+    let mut qual_ptrs: Vec<*const u8> = Vec::with_capacity(quals.len());
 
     for seq in seqs {
         if !(seq[seq.len()-1] == '\0' as u8) {
@@ -90,12 +103,18 @@ pub fn poa_consensus(
         }
         seq_ptrs.push(seq.as_ptr());
     }
+    for qual in quals {
+        if !(qual[qual.len()-1] == '\0' as u8) {
+            panic!("Input qualities must be null terminated");
+        }
+        qual_ptrs.push(qual.as_ptr());
+    }
 
     let c_buf: *const c_char = unsafe {
         poa_func(
             seq_ptrs.as_ptr(),
+            qual_ptrs.as_ptr(),
             num_seqs,
-            // consensus.as_ptr(),
             alignment_type,
             match_score,
             mismatch_score,
@@ -107,7 +126,6 @@ pub fn poa_consensus(
     };
     let c_str: &CStr = unsafe { CStr::from_ptr(c_buf) };
     let str_slice: &str = c_str.to_str().unwrap();
-    // let str_buf: String = str_slice.to_owned();  // if necessary
 
     str_slice
 }
@@ -125,14 +143,28 @@ mod tests {
         "AACGCCCGTC",
         "AGTGCTCGTT",
         "AATGCTCGTT"];
-        let mut cseqs: Vec<Vec<u8>> = Vec::with_capacity(seqs.len()); 
+        let quals = vec!["FFFFFFFFFF",
+        "FFFFFFFFF",
+        "FFFFFFFFFF",
+        "FFFFFFFFFF",
+        "FFFFFFFFFF",
+        "FFFFFFFFFF",
+        ];
+        let mut cseqs: Vec<Vec<u8>> = Vec::with_capacity(seqs.len());
         for seq in seqs {
             let mut tmp_seq = String::from(seq);
             tmp_seq.push_str("\0");
             cseqs.push((tmp_seq.into_bytes()).to_vec());
         }
-        
-        let consensus = poa_consensus(&cseqs, 1, 5, -4, -3, -1, -3, -1);
+
+        let mut cquals: Vec<Vec<u8>> = Vec::with_capacity(quals.len());
+        for qual in quals {
+            let mut tmp_qual = String::from(qual);
+            tmp_qual.push_str("\0");
+            cquals.push((tmp_qual.into_bytes()).to_vec());
+        }
+
+        let consensus = poa_consensus(&cseqs, &cquals, 1, 5, -4, -3, -1, -3, -1);
 
         let expected = "AATGCCCGTT";
         assert_eq!(consensus, expected);
@@ -141,6 +173,7 @@ mod tests {
     #[test]
     fn test_dna_consensus() {
         let mut seqs = vec![];
+        let mut quals = vec![];
 
         // generated each string by adding small tweaks to the expected consensus "AATGCCCGTT"
         for seq in ["ATTGCCCGTT\0",
@@ -151,8 +184,16 @@ mod tests {
             "AATGCTCGTT\0"].iter() {
             seqs.push((*seq).bytes().map(|x|{x as u8}).collect::<Vec<u8>>());
         }
+        for qual in ["FFFFFFFFFF\0",
+            "FFFFFFFFF\0",
+            "FFFFFFFFFF\0",
+            "FFFFFFFFFF\0",
+            "FFFFFFFFFF\0",
+            "FFFFFFFFFF\0"].iter() {
+            quals.push((*qual).bytes().map(|x|{x as u8}).collect::<Vec<u8>>());
+        }
 
-        let consensus = poa_consensus(&seqs, 1, 5, -4, -3, -1, -3, -1);
+        let consensus = poa_consensus(&seqs, &quals, 1, 5, -4, -3, -1, -3, -1);
 
         let expected = "AATGCCCGTT";
         assert_eq!(consensus, expected);
@@ -162,6 +203,8 @@ mod tests {
     #[test]
     fn test_protein_consensus() {
         let mut seqs = vec![];
+        let mut quals = vec![];
+
         // expect consensus "FNLKPSWDDCQ"
         for seq in ["FNLKESWDDCQ\0".to_string(),
             "FNLKPSWDCQ\0".to_string(),
@@ -172,7 +215,16 @@ mod tests {
             seqs.push(seq.chars().into_iter().map(|x|{x as u8}).collect::<Vec<u8>>());
         }
 
-        let consensus = poa_consensus(&seqs, 1, 5, -4, -3, -1, -3, -1);
+        for qual in ["FFFFFFFFFFF\0".to_string(),
+            "FFFFFFFFFF\0".to_string(),
+            "FFFFFFFFFFFF\0".to_string(),
+            "FFFFFFFFF\0".to_string(),
+            "FFFFFFFFFF\0".to_string(),
+            "FFFFFFFFFFFF\0".to_string()].iter() {
+            quals.push(qual.chars().into_iter().map(|x|{x as u8}).collect::<Vec<u8>>());
+        }
+
+        let consensus = poa_consensus(&seqs, &quals, 1, 5, -4, -3, -1, -3, -1);
         eprintln!("{:?}", &consensus);
 
         let expected = "FNLKPSWDDCQ";
@@ -195,7 +247,7 @@ mod tests {
             seqs.push((*seq).bytes().map(|x|{x as u8}).collect::<Vec<u8>>());
         }
 
-        poa_consensus(&seqs, 1, 5, -4, -3, -1, -3, -1);
+        poa_consensus(&seqs, &seqs, 1, 5, -4, -3, -1, -3, -1);
 
     }
 }
