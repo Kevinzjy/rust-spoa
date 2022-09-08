@@ -31,6 +31,7 @@ use rust_spoa::poa_consensus;
 
 fn main() {
     let mut seqs = vec![];
+    let mut quals = vec![];
 
     // generated each string by adding small tweaks to the expected consensus "AATGCCCGTT"
     for seq in ["ATTGCCCGTT\0",

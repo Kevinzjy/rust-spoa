@@ -233,6 +233,37 @@ mod tests {
     }
 
     #[test]
+    fn test_qualitites() {
+        let mut seqs = vec![];
+        let mut quals = vec![];
+
+        // expect consensus "FNLKPSWDDCQ"
+        for seq in [
+            "ATTGCCCATT\0".to_string(),
+            "ATTGCCCGTT\0".to_string(),
+            "ATTGCCCATT\0".to_string(),
+            "ATTGCCCGTT\0".to_string(),
+        ].iter() {
+            seqs.push(seq.chars().into_iter().map(|x|{x as u8}).collect::<Vec<u8>>());
+        }
+
+        for qual in [
+            "FFFFFFFIFF\0".to_string(),
+            "FFFFFFF#FF\0".to_string(),
+            "FFFFFFFIFF\0".to_string(),
+            "FFFFFFF#FF\0".to_string(),
+        ].iter() {
+            quals.push(qual.chars().into_iter().map(|x|{x as u8}).collect::<Vec<u8>>());
+        }
+
+        let consensus = poa_consensus(&seqs, &quals, 1, 5, -4, -3, -1, -3, -1);
+        eprintln!("{:?}", &consensus);
+
+        let expected = "ATTGCCCATT";
+        assert_eq!(consensus, expected);
+    }
+
+    #[test]
     #[should_panic]
     fn test_not_null_terminated() {
         let mut seqs = vec![];

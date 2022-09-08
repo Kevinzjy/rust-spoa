@@ -7,13 +7,13 @@ extern "C" {
 unsigned poa_func(char** seqs,  // the sequences (null-terminated) to perform multiple-sequence-alignment with.
                   char** quals, // the sequences (null-terminated) to perform multiple-sequence-alignment with.
                   int num_seqs, // the number of sequences being multiply aligned
-                  int l,        // the alignment type: 0 = local align, 1 = global align, 2 = semi-global
-                  int m,        // the score to give a sequence match in alignment, e.g. 5
-                  int n,        // the score to give a sequence mismatch in alignment, e.g. -4
-                  int g,        // the score to give a sequence gap in alignment, e.g. -3
-                  int e,        // the score to give a sequence gap extension in alignment, e.g. -1
-                  int q,        // the score to give a sequence second gap in alignment, e.g. -3
-                  int c,        // the score to give a sequence second gap extension in alignment, e.g. -1
+                  int l,        // alignment mode: 0 = local align, 1 = global align, 2 = semi-global
+                  int m,        // score for matching bases, e.g. 5
+                  int n,        // score for mismatching bases, e.g. -4
+                  int g,        // gap opening penalty (must be non-positive), e.g. -3
+                  int e,        // gap extension penalty (must be non-positivie), e.g. -1
+                  int q,        // gap opening penalty of the second affine function (must be non-positivie), e.g. -3
+                  int c,        // gap extension penalty of the second affine function (must be non-positivie), e.g. -1
                   );
 
 
